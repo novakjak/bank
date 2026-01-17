@@ -44,9 +44,10 @@ public class ConnectionManager
         while (IsRunning)
         {
             var conn = await _listener.AcceptNetworkClientAsync(_tokenSource.Token);
-            Console.WriteLine("accepted");
             await _connectionLock.WaitAsync();
-            _connections.Add(new BankConnection(conn, _tokenSource));
+            var bankConn = new BankConnection(conn, _tokenSource);
+            bankConn.Start();
+            _connections.Add(bankConn);
             _connectionLock.Release();
         }
         Stop();

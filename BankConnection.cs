@@ -11,6 +11,8 @@ public class BankConnection
     public IPAddress RealIp { get; private set; }
     public int Port { get; private set; }
 
+    public bool Started { get; set; } = false;
+
     public int TimeoutMs { get; set; }
 
     private INetworkClient _client;
@@ -35,13 +37,52 @@ public class BankConnection
     }
     public void Start()
     {
-        _connectionTask ??= Task.Run(Run);
+        Started = true;
+        _connectionTask ??= Task.Run(Run, _tokenSource.Token);
     }
 
     public async Task Run()
     {
         if (!_client.Connected)
             await _client.ConnectAsync(RealIp, Port, _tokenSource.Token);
+        using var stream = _client.GetStream();
+        using var reader = new StreamReader(stream);
+        using var writer = new StreamWriter(stream);
+        while (Started)
+        {
+            string line;
+            IBankMsg msg;
+            try
+            {
+                line = (await reader.ReadLineAsync(_tokenSource.Token))!.Trim();
+            }
+            catch (IOException e)
+            {
+                Console.Error.WriteLine(e.Message);
+                Started = false;
+                continue;
+            }
+            if (line.Length == 0)
+                continue;
+            try
+            {
+                msg = line!.MsgFromString();
+            }
+            catch (Exception e)
+            {
+                writer.WriteLine($"ER {e.Message}");
+                writer.Flush();
+                continue;
+            }
+            Console.WriteLine(msg);
+        }
+        Stop();
     }
-    
+
+    public void Stop()
+    {
+        Started = false;
+        _connectionTask = null;
+        _client.Close();
+    }
 }
