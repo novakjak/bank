@@ -67,14 +67,15 @@ public class BankConnection
             try
             {
                 msg = line!.MsgFromString();
+                Console.WriteLine(msg);
             }
             catch (Exception e)
             {
                 writer.WriteLine($"ER {e.Message}");
                 writer.Flush();
+                Console.Error.WriteLine(e.StackTrace);
                 continue;
             }
-            Console.WriteLine(msg);
         }
         Stop();
     }
