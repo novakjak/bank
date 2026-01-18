@@ -12,7 +12,7 @@ public sealed class Logger
 {
     const string TIME_FORMAT = "HH:mm:ss.ffff";
     private readonly static string projectName = Assembly.GetCallingAssembly().GetName().Name!;
-    private readonly static string logFilePath = $"{projectName}.log";
+    public readonly static string DefaultLogFile = $"{projectName}.log";
 
     
     private static Logger? _instance;
@@ -21,7 +21,7 @@ public sealed class Logger
 
     private Logger()
     {
-        _logFile = File.Open(logFilePath, FileMode.Create);
+        _logFile = File.Open(Config.Get().LogFile, FileMode.Create);
         _writer = new StreamWriter(_logFile);
         _instance = this;
     }

@@ -7,11 +7,16 @@ using System.Threading.Tasks;
 
 const int START_PORT = 65525;
 const int MAX_PORT = 65535;
+const string CONFIG_FILE = "settings.ini";
+
+var conf = ConfigParser.Parse<Config>(CONFIG_FILE);
 
 
 var tokenSource = new CancellationTokenSource();
 
-using var listener = NetworkListener.CreateWithinRange(START_PORT, MAX_PORT);
+using var listener = conf.DefaultPort is not null
+    ? NetworkListener.Create((int)conf.DefaultPort)
+    : NetworkListener.CreateWithinRange(START_PORT, MAX_PORT);
 if (listener is null)
 {
     Logger.Error("No port available");
