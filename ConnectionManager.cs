@@ -41,6 +41,7 @@ public class ConnectionManager
     {
         IsRunning = true;
         Start();
+        Console.WriteLine($"Listening on {_listener.LocalEndPoint.Address}:{_listener.LocalEndPoint.Port}");
         while (IsRunning)
         {
             var conn = await _listener.AcceptNetworkClientAsync(_tokenSource.Token);

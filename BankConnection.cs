@@ -103,7 +103,7 @@ public class BankConnection
             catch (Exception e)
             {
                 // Do not send error messages on responses
-                if (!wasResp)
+                if (!wasResponse)
                     await SendMessage($"ER {e.Message}");
                 Console.Error.WriteLine(e.StackTrace);
                 continue;
