@@ -18,7 +18,15 @@ if (listener is null)
     return 1;
 }
 
-ConnectionManager.Init(listener, tokenSource);
-await ConnectionManager.Get().Run();
+try
+{
+    ConnectionManager.Init(listener, tokenSource);
+    await ConnectionManager.Get().Run();
+}
+catch (Exception e)
+{
+    Logger.Error(e.Message);
+    return 1;
+}
 
 return 0;
