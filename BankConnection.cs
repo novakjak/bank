@@ -1,3 +1,4 @@
+// The structure of this class is inspired by PeerConnection in my bittorrent project
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -92,22 +93,31 @@ public class BankConnection
                     continue;
                 }
             }
+            if (wasResponse)
+            {
+                try
+                {
+                    if (msg!.GetMsgType() == MsgType.ER)
+                        continue;
+                    msg.Handle(this);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e.Message);
+                }
+                continue;
+            }
             try
             {
-                if (!wasResponse)
-                    msg = line.MsgFromString();
+                msg = line.MsgFromString();
                 Logger.Info($"Received message from {BankIp ?? RealIp} - {msg}");
 
-                if (msg!.GetMsgType() == MsgType.ER)
-                    continue;
-                var resp = msg!.Handle(this);
+                var resp = msg.Handle(this);
                 await SendMessage(resp);
             }
             catch (Exception e)
             {
-                // Do not send error messages on responses
-                if (!wasResponse)
-                    await SendMessage($"ER {e.Message}");
+                await SendMessage($"ER {e.Message}");
                 Logger.Error(e.Message);
                 continue;
             }
