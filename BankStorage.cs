@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
+// Singleton for storing information about bank accounts
 public class BankStorage
 {
     private const long ACC_NUM_MIN = 10000;

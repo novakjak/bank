@@ -75,7 +75,8 @@ public class NetworkListener : INetworkListener, IDisposable
     public static IPAddress GetLocalAddr()
     {
         using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Unspecified);
-        // 240.0.0.1 is reserved and unreachable, this choice is made by design.
+        // 240.0.0.1 is reserved and unreachable, this was chosen by design.
+        // We just need to create a socket on an available interface.
         sock.Connect("240.0.0.1", 1);
         return (sock.LocalEndPoint as IPEndPoint)!.Address;
     }

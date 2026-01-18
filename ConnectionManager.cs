@@ -1,3 +1,5 @@
+// The structure of this class is heavily inspired by TorrentTask in my bittorrent project
+
 using System;
 using System.Net;
 using System.Net.Sockets;
