@@ -50,6 +50,7 @@ public class BankConnection
     {
         if (!_client.Connected)
             await _client.ConnectAsync(RealIp, Port, _tokenSource.Token);
+        Logger.Info($"Started communication with {BankIp ?? RealIp}");
         using var stream = _client.GetStream();
         using var reader = new StreamReader(stream);
         _writer = new StreamWriter(stream);
@@ -67,7 +68,7 @@ public class BankConnection
             }
             catch (IOException e)
             {
-                Console.Error.WriteLine(e.Message);
+                Logger.Error(e.Message);
                 Started = false;
                 continue;
             }
@@ -83,6 +84,7 @@ public class BankConnection
                     msg = t.RespFromString(line);
                     _expectedResponses[i] -= 1;
                     wasResponse = true;
+                    Logger.Info($"Received response fom {BankIp ?? RealIp} - {msg}");
                     break;
                 }
                 catch
@@ -94,6 +96,7 @@ public class BankConnection
             {
                 if (!wasResponse)
                     msg = line.MsgFromString();
+                Logger.Info($"Received message from {BankIp ?? RealIp} - {msg}");
 
                 if (msg!.GetMsgType() == MsgType.ER)
                     continue;
@@ -105,7 +108,7 @@ public class BankConnection
                 // Do not send error messages on responses
                 if (!wasResponse)
                     await SendMessage($"ER {e.Message}");
-                Console.Error.WriteLine(e.StackTrace);
+                Logger.Error(e.Message);
                 continue;
             }
         }
@@ -123,6 +126,7 @@ public class BankConnection
         if (task is not null)
             await task;
         _writer?.Flush();
+        Logger.Info($"Sent message to {BankIp ?? RealIp} - {msg}");
     }
 
     public void Stop()
@@ -131,5 +135,6 @@ public class BankConnection
         _connectionTask = null;
         _writer?.Close();
         _client.Close();
+        Logger.Info($"Terminated connection with {BankIp ?? RealIp}");
     }
 }

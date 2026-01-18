@@ -41,10 +41,11 @@ public class ConnectionManager
     {
         IsRunning = true;
         Start();
-        Console.WriteLine($"Listening on {_listener.LocalEndPoint.Address}:{_listener.LocalEndPoint.Port}");
+        Logger.Info($"Listening on {_listener.LocalEndPoint.Address}:{_listener.LocalEndPoint.Port}");
         while (IsRunning)
         {
             var conn = await _listener.AcceptNetworkClientAsync(_tokenSource.Token);
+            Logger.Info($"Accepted connection from {conn.IPEndPoint.Address}");
             await _connectionLock.WaitAsync();
             var bankConn = new BankConnection(conn, _tokenSource);
             bankConn.Start();

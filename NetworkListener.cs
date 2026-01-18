@@ -51,7 +51,8 @@ public class NetworkListener : INetworkListener, IDisposable
             catch (SocketException e)
             {
                 lastEx = ExceptionDispatchInfo.Capture(e);
-                continue; // Port is in use, move onto the next one.
+                Logger.Debug($"Port {port} is already in use; skipping");
+                continue;
             }
             finally
             {

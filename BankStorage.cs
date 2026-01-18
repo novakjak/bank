@@ -18,6 +18,7 @@ public class BankStorage
     private BankStorage()
     {
         Load();
+        Logger.Debug("Initialized BankStorage singleton");
     }
 
     public static BankStorage Get()
@@ -51,6 +52,7 @@ public class BankStorage
             }
 
             _accounts.Add(accNum, 0);
+            Logger.Info($"Opened account {accNum}");
             return accNum;
         }
     }
@@ -61,6 +63,7 @@ public class BankStorage
             ThrowOnNotExists(accNum);
             if (_accounts[accNum] > 0)
                 throw new InvalidOperationException("Cannot delete account with funds in it");
+            Logger.Info($"Removed account {accNum}");
             _accounts.Remove(accNum);
         }
     }
@@ -71,6 +74,7 @@ public class BankStorage
         {
             ThrowOnNotExists(accNum);
             _accounts[accNum] += amount;
+            Logger.Info($"Deposited {amount} to account {accNum}");
         }
     }
     public void Withdraw(long accNum, long amount)
@@ -81,6 +85,7 @@ public class BankStorage
             if (_accounts[accNum] < amount)
                 throw new ArgumentException("Cannot withdraw more than is in account");
             _accounts[accNum] -= amount;
+            Logger.Info($"Withdrawn {amount} from account {accNum}");
         }
     }
     public long Balance(long accNum)

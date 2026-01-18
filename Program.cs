@@ -14,7 +14,7 @@ var tokenSource = new CancellationTokenSource();
 using var listener = NetworkListener.CreateWithinRange(START_PORT, MAX_PORT);
 if (listener is null)
 {
-    Console.Error.WriteLine("No port available");
+    Logger.Error("No port available");
     return 1;
 }
 
