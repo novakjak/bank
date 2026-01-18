@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 
 public class BankConnection
 {
+    public static string Code { get; } = NetworkListener.GetLocalAddr().ToString();
+
     public IPAddress? BankIp { get; private set; }
     public IPAddress RealIp { get; private set; }
     public int Port { get; private set; }
@@ -66,12 +68,16 @@ public class BankConnection
                 continue;
             try
             {
-                msg = line!.MsgFromString();
+                msg = line.MsgFromString();
                 Console.WriteLine(msg);
+                Console.WriteLine(msg.GetType().Name);
+                var resp = msg.Handle(this);
+                await writer.WriteLineAsync(resp.ToString().AsMemory(), _tokenSource.Token);
+                writer.Flush();
             }
             catch (Exception e)
             {
-                writer.WriteLine($"ER {e.Message}");
+                await writer.WriteLineAsync($"ER {e.Message}".AsMemory(), _tokenSource.Token);
                 writer.Flush();
                 Console.Error.WriteLine(e.StackTrace);
                 continue;

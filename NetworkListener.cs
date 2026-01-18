@@ -21,6 +21,7 @@ public interface INetworkListener : IDisposable
 
 public class NetworkListener : INetworkListener, IDisposable
 {
+    public static IPAddress LocalAddr { get; } = NetworkListener.GetLocalAddr();
     private TcpListener _listener;
 
     public IPEndPoint LocalEndPoint { get => (_listener.LocalEndpoint as IPEndPoint)!; }
@@ -29,12 +30,7 @@ public class NetworkListener : INetworkListener, IDisposable
 
     public static INetworkListener Create(int port)
     {
-        var listener = TcpListener.Create(port);
-        return new NetworkListener(listener);
-    }
-    public static INetworkListener Create(IPEndPoint endpoint)
-    {
-        var listener = new TcpListener(endpoint);
+        var listener = new TcpListener(NetworkListener.LocalAddr, port);
         return new NetworkListener(listener);
     }
 
@@ -44,13 +40,11 @@ public class NetworkListener : INetworkListener, IDisposable
             throw new ArgumentException("min_port is greater that max_port");
         INetworkListener? listener = null;
         ExceptionDispatchInfo? lastEx = null;
-        IPEndPoint localEndPoint = GetLocalEndPoint();
         for (int port = min_port; port <= max_port; port++)
         {
-            localEndPoint.Port = port;
             try
             {
-                listener = NetworkListener.Create(localEndPoint);
+                listener = NetworkListener.Create(port);
                 listener.Start();
                 break;
             }
@@ -77,11 +71,11 @@ public class NetworkListener : INetworkListener, IDisposable
     public void Stop() => _listener.Stop();
     public void Dispose() => _listener.Dispose();
 
-    public static IPEndPoint GetLocalEndPoint()
+    public static IPAddress GetLocalAddr()
     {
         using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Unspecified);
         // 240.0.0.1 is reserved and unreachable, this choice is made by design.
         sock.Connect("240.0.0.1", 1);
-        return (sock.LocalEndPoint as IPEndPoint)!;
+        return (sock.LocalEndPoint as IPEndPoint)!.Address;
     }
 }
