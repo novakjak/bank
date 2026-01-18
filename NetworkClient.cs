@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 public interface INetworkClient : IDisposable
 {
     IPEndPoint IPEndPoint { get; }
+    int SendTimeout { get; set; }
+    int ReceiveTimeout { get; set; }
     bool Connected { get; }
     ValueTask ConnectAsync(IPAddress address, int port, CancellationToken token);
     Stream GetStream();
@@ -31,6 +33,8 @@ public class NetworkClient : INetworkClient
         => await _client.ConnectAsync(address, port, token);
 
     public Stream GetStream() => _client.GetStream();
+    public int SendTimeout { get => _client.SendTimeout; set => _client.SendTimeout = value; }
+    public int ReceiveTimeout { get => _client.ReceiveTimeout; set => _client.ReceiveTimeout = value; }
     public void Close() => _client.Close();
     public void Dispose() => _client.Dispose();
 }

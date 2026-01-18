@@ -1,9 +1,9 @@
 // The structure of this class is inspired by PeerConnection in my bittorrent project
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,7 +17,20 @@ public class BankConnection
 
     public bool Started { get; set; } = false;
 
-    public int TimeoutMs { get; set; }
+    private int _timeout;
+    public int TimeoutMs
+    {
+        get => _timeout;
+        set {
+            if (value < 0)
+                return;
+            _timeout = value;
+            _client.SendTimeout = value;
+            _client.ReceiveTimeout = value;
+            _client.GetStream().ReadTimeout = value;
+            _client.GetStream().WriteTimeout = value;
+        }
+    }
 
     private INetworkClient _client;
     private StreamWriter? _writer;
@@ -30,6 +43,7 @@ public class BankConnection
     public BankConnection(INetworkClient client, CancellationTokenSource tokenSource)
     {
         _client = client;
+        TimeoutMs = Config.Get().Timeout * 1000;
         _tokenSource = tokenSource;
         RealIp = _client.IPEndPoint.Address;
         Port = _client.IPEndPoint.Port;
@@ -37,6 +51,7 @@ public class BankConnection
     public BankConnection(IPAddress addr, int port, CancellationTokenSource tokenSource)
     {
         _client = new NetworkClient();
+        TimeoutMs = Config.Get().Timeout * 1000;
         _tokenSource = tokenSource;
         RealIp = addr;
         Port = port;
@@ -65,7 +80,16 @@ public class BankConnection
             bool wasResponse = false;
             try
             {
-                line = (await reader.ReadLineAsync(_tokenSource.Token))!.Trim();
+                var timeout = CancellationTokenSource
+                    .CreateLinkedTokenSource(_tokenSource.Token);
+                timeout.CancelAfter(TimeoutMs);
+                line = (await reader.ReadLineAsync(timeout.Token))!.Trim();
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.Info($"Timeout with {BankIp ?? RealIp} expired");
+                Started = false;
+                continue;
             }
             catch (IOException e)
             {
