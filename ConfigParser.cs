@@ -37,7 +37,7 @@ public sealed class ConfigParser
 	public static T Parse<T>(string path) where T: IConfig<T>
 	{
 		var ini = new ConfigurationBuilder()
-			.AddIniFile(path)
+			.AddIniFile(path, true)
 			.Build();
 		
 		var type = typeof(T);
