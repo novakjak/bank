@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Net;
 using System.Net.Sockets;
 
-public enum MsgType
+public enum MsgType : int
 {
     BC,
     BA,
@@ -29,7 +29,7 @@ public static class MsgTypeExtensions
         MsgType.AB => AccountBalance.FromString(str),
         MsgType.AR => AccountRemove.FromString(str),
         MsgType.RP => RobberyPlan.FromString(str),
-        _ => throw new InvalidOperationException("Msg type is invalid"),
+        _ => throw new InvalidOperationException("Response type is invalid"),
     };
     public static IBankMsg MsgFromString(this string str)
     {
@@ -47,23 +47,38 @@ public static class MsgTypeExtensions
         }
         return type.MsgFromString(str);
     }
+    public static IBankMsg RespFromString(this MsgType type, string str) => type switch
+    {
+        MsgType.BC => BankCodeResp.FromString(str),
+        MsgType.BA => BankAmountResp.FromString(str),
+        MsgType.BN => BankNumberResp.FromString(str),
+        MsgType.AC => AccountCreateResp.FromString(str),
+        MsgType.AD => AccountDepositResp.FromString(str),
+        MsgType.AW => AccountWithdrawResp.FromString(str),
+        MsgType.AB => AccountBalanceResp.FromString(str),
+        MsgType.AR => AccountRemoveResp.FromString(str),
+        MsgType.RP => RobberyPlanResp.FromString(str),
+        MsgType.ER => ErrorResp.FromString(str),
+        _ => throw new InvalidOperationException("Response type is invalid"),
+    };
 }
 
 public interface IBankMsg
 {
     static abstract MsgType Type { get; }
+    MsgType GetMsgType();
     static abstract IBankMsg FromString(string str);
     IBankMsg Handle(BankConnection bc);
     // ToString in on object and does not need to be defined here
 }
 public interface IMsgWithDetails : IBankMsg
 {
-    public int Account { get; set; }
+    public long Account { get; set; }
     public string Code { get; set; }
 }
 public interface IMsgWithAmount : IBankMsg
 {
-    public int Amount { get; set; }
+    public long Amount { get; set; }
 }
 public interface IMsgWithString : IBankMsg
 {
@@ -81,6 +96,7 @@ public class BankMsg<T> : IBankMsg where T: IBankMsg, new()
         var t = cls.GetProperty("Type", typeof(MsgType))!.GetValue(null, null)!;
         return (MsgType)t;
     }}
+    public MsgType GetMsgType() => T.Type;
 
     public virtual IBankMsg Handle(BankConnection bc)
             => throw new NotImplementedException($"Handling of message {T.Type} was not implemented");
@@ -109,6 +125,7 @@ public class BankMsg<T> : IBankMsg where T: IBankMsg, new()
 }
 public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Contains<T, U>, new()
 {
+    new public static MsgType Type => U.Type;
     public U InnerMsg { get; set; }
 
     public Contains() => InnerMsg = new U();
@@ -117,7 +134,6 @@ public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Conta
     {
         if (InnerMsg is null)
             throw new NotImplementedException($"Handling of message {U.Type} was");
-        Console.WriteLine(this.GetType().Name);
         return InnerMsg.Handle(bc);
     }
     new public static IBankMsg FromString(string str)
@@ -129,10 +145,10 @@ public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Conta
 
     public override string? ToString() => InnerMsg.ToString();
 }
-public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails where T: IBankMsg, new()
+public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails  where T: IBankMsg, new()
 {
     new public static MsgType Type => T.Type;
-    public int Account { get; set; }
+    public long Account { get; set; }
     public string Code { get; set; } = "";
 
     new public static IBankMsg FromString(string str)
@@ -147,7 +163,7 @@ public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails
         return msg;
     }
 
-    public static (int, IPAddress) ConsumeAccountDetails(ref string str)
+    public static (long, IPAddress) ConsumeAccountDetails(ref string str)
     {
         char[] separators = {' ', '\t', '\v'};
         var parts = str.Split(separators, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -158,10 +174,10 @@ public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails
         var accountDetails = accountDetailsStr.Split('/');
         if (accountDetails.Count() != 2)
             throw new ArgumentException("Account has wrong format.");
-        int number;
+        long number;
         try
         {
-            number = Int32.Parse(accountDetails[0]);
+            number = Int64.Parse(accountDetails[0]);
         }
         catch
         {
@@ -183,10 +199,10 @@ public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails
 
     public override string? ToString() => $"{InnerMsg.ToString()} {Account}/{Code}";
 }
-public class MsgWithAmount<T> : Contains<MsgWithAmount<T>, T>, IMsgWithAmount where T: IBankMsg, new()
+public class MsgWithAmount<T> : Contains<MsgWithAmount<T>, T>, IMsgWithAmount  where T: IBankMsg, new()
 {
     new public static MsgType Type => T.Type;
-    public int Amount { get; set; }
+    public long Amount { get; set; }
 
     new public static IBankMsg FromString(string str)
     {
@@ -199,7 +215,7 @@ public class MsgWithAmount<T> : Contains<MsgWithAmount<T>, T>, IMsgWithAmount wh
         return msg;
     }
 
-    public static int ConsumeAmount(ref string str)
+    public static long ConsumeAmount(ref string str)
     {
         char[] separators = {' ', '\t', '\v'};
         var parts = str.Split(separators, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -209,7 +225,7 @@ public class MsgWithAmount<T> : Contains<MsgWithAmount<T>, T>, IMsgWithAmount wh
         str = str.Substring(0, str.Length - numStr.Length);
         try
         {
-            return Int32.Parse(numStr);
+            return Int64.Parse(numStr);
         }
         catch
         {
@@ -219,7 +235,7 @@ public class MsgWithAmount<T> : Contains<MsgWithAmount<T>, T>, IMsgWithAmount wh
 
     public override string? ToString() => $"{InnerMsg.ToString()} {Amount}";
 }
-public class MsgWithString<T> : Contains<MsgWithString<T>, T>, IMsgWithString where T: IBankMsg, new()
+public class MsgWithString<T> : Contains<MsgWithString<T>, T>, IMsgWithString  where T: IBankMsg, new()
 {
     new public static MsgType Type => T.Type;
     public string Str { get; set; } = "";
@@ -228,7 +244,6 @@ public class MsgWithString<T> : Contains<MsgWithString<T>, T>, IMsgWithString wh
     {
         str = str.Trim();
         var strValue = MsgWithString<T>.ConsumeString(ref str);
-        Console.WriteLine(str);
         var t = (T)T.FromString(str);
         var msg = new MsgWithString<T>();
         msg.Str = strValue;
@@ -249,7 +264,7 @@ public class MsgWithString<T> : Contains<MsgWithString<T>, T>, IMsgWithString wh
 
     public override string? ToString() => $"{InnerMsg.ToString()} {Str}";
 }
-public class MsgWithIpAddr<T> : Contains<MsgWithIpAddr<T>, T>, IMsgWithIpAddr where T: IBankMsg, new()
+public class MsgWithIpAddr<T> : Contains<MsgWithIpAddr<T>, T>, IMsgWithIpAddr  where T: IBankMsg, new()
 {
     new public static MsgType Type => T.Type;
     public IPAddress Addr { get; set; } = IPAddress.None;
@@ -426,4 +441,10 @@ public sealed class RobberyPlanResp : Contains<RobberyPlanResp, MsgWithString<Ba
 public sealed class ErrorResp : Contains<ErrorResp, MsgWithString<BankMsg<ErrorResp>>>
 {
     new public static MsgType Type => MsgType.ER;
+    public override IBankMsg Handle(BankConnection bc)
+    {
+        var resp = new ErrorResp();
+        resp.InnerMsg.Str = "Unexpected error";
+        return resp;
+    }
 }

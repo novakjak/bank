@@ -4,15 +4,15 @@ using System.Threading.Tasks;
 
 public class BankStorage
 {
-    private const int ACC_NUM_MIN = 10000;
-    private const int ACC_NUM_MAX = 99999;
+    private const long ACC_NUM_MIN = 10000;
+    private const long ACC_NUM_MAX = 99999;
 
     public static BankStorage Storage { get => Get(); }
     
     private static BankStorage? _instance;
-    private Dictionary<int, int> _accounts = new();
-    private int _nextAccNumber = ACC_NUM_MIN;
-    private ISet<int> _freeAccNumbers = new HashSet<int>();
+    private Dictionary<long, long> _accounts = new();
+    private long _nextAccNumber = ACC_NUM_MIN;
+    private ISet<long> _freeAccNumbers = new HashSet<long>();
     private Lock _accountsLock = new();
 
     private BankStorage()
@@ -27,14 +27,14 @@ public class BankStorage
         return _instance;
     }
 
-    public int TotalBalance() => _accounts.Values.Sum();
-    public int AccountCount() => _accounts.Count;
+    public long TotalBalance() => _accounts.Values.Sum();
+    public long AccountCount() => _accounts.Count;
 
-    public int OpenAccount()
+    public long OpenAccount()
     {
         lock (_accountsLock)
         {
-            var accNum = -1;
+            long accNum = -1;
             if (_freeAccNumbers.Count > 0)
             {
                 accNum = _freeAccNumbers.First();
@@ -54,7 +54,7 @@ public class BankStorage
             return accNum;
         }
     }
-    public void Remove(int accNum)
+    public void Remove(long accNum)
     {
         lock (_accountsLock)
         {
@@ -65,7 +65,7 @@ public class BankStorage
         }
     }
 
-    public void Deposit(int accNum, int amount)
+    public void Deposit(long accNum, long amount)
     {
         lock (_accountsLock)
         {
@@ -73,7 +73,7 @@ public class BankStorage
             _accounts[accNum] += amount;
         }
     }
-    public void Withdraw(int accNum, int amount)
+    public void Withdraw(long accNum, long amount)
     {
         lock (_accountsLock)
         {
@@ -83,7 +83,7 @@ public class BankStorage
             _accounts[accNum] -= amount;
         }
     }
-    public int Balance(int accNum)
+    public long Balance(long accNum)
     {
         lock (_accountsLock)
         {
@@ -92,7 +92,7 @@ public class BankStorage
         }
     }
 
-    private void ThrowOnNotExists(int accNum)
+    private void ThrowOnNotExists(long accNum)
     {
         if (!_accounts.ContainsKey(accNum))
             throw new KeyNotFoundException($"Account {accNum} does not exist");

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.IO;
@@ -18,9 +19,11 @@ public class BankConnection
     public int TimeoutMs { get; set; }
 
     private INetworkClient _client;
+    private StreamWriter? _writer;
     private BankStorage _bank = BankStorage.Get();
     private CancellationTokenSource _tokenSource;
     private Task? _connectionTask;
+    private int[] _expectedResponses = new int[Enum.GetValues<MsgType>().Count()];
 
     
     public BankConnection(INetworkClient client, CancellationTokenSource tokenSource)
@@ -49,11 +52,15 @@ public class BankConnection
             await _client.ConnectAsync(RealIp, Port, _tokenSource.Token);
         using var stream = _client.GetStream();
         using var reader = new StreamReader(stream);
-        using var writer = new StreamWriter(stream);
+        _writer = new StreamWriter(stream);
+        var bankCode = new BankCode();
+        await SendMessage(bankCode);
+
         while (Started)
         {
             string line;
-            IBankMsg msg;
+            IBankMsg? msg = null;
+            bool wasResponse = false;
             try
             {
                 line = (await reader.ReadLineAsync(_tokenSource.Token))!.Trim();
@@ -66,19 +73,38 @@ public class BankConnection
             }
             if (line.Length == 0)
                 continue;
+            for (int i = 0; i < _expectedResponses.Count(); i++)
+            {
+                if (_expectedResponses[i] == 0 && i != (int)MsgType.ER)
+                    continue;
+                try
+                {
+                    var t = (MsgType)i;
+                    msg = t.RespFromString(line);
+                    _expectedResponses[i] -= 1;
+                    wasResponse = true;
+                    break;
+                }
+                catch
+                {
+                    continue;
+                }
+            }
             try
             {
-                msg = line.MsgFromString();
-                Console.WriteLine(msg);
-                Console.WriteLine(msg.GetType().Name);
-                var resp = msg.Handle(this);
-                await writer.WriteLineAsync(resp.ToString().AsMemory(), _tokenSource.Token);
-                writer.Flush();
+                if (!wasResponse)
+                    msg = line.MsgFromString();
+
+                if (msg!.GetMsgType() == MsgType.ER)
+                    continue;
+                var resp = msg!.Handle(this);
+                await SendMessage(resp);
             }
             catch (Exception e)
             {
-                await writer.WriteLineAsync($"ER {e.Message}".AsMemory(), _tokenSource.Token);
-                writer.Flush();
+                // Do not send error messages on responses
+                if (!wasResp)
+                    await SendMessage($"ER {e.Message}");
                 Console.Error.WriteLine(e.StackTrace);
                 continue;
             }
@@ -86,10 +112,24 @@ public class BankConnection
         Stop();
     }
 
+    public async Task SendMessage(IBankMsg msg)
+    {
+        _expectedResponses[(int)msg.GetMsgType()] += 1;
+        await SendMessage(msg.ToString()!);
+    }
+    public async Task SendMessage(string msg)
+    {
+        var task = _writer?.WriteLineAsync(msg.AsMemory(), _tokenSource.Token);
+        if (task is not null)
+            await task;
+        _writer?.Flush();
+    }
+
     public void Stop()
     {
         Started = false;
         _connectionTask = null;
+        _writer?.Close();
         _client.Close();
     }
 }
