@@ -68,7 +68,7 @@ public interface IBankMsg
     static abstract MsgType Type { get; }
     MsgType GetMsgType();
     static abstract IBankMsg FromString(string str);
-    IBankMsg Handle(BankConnection bc);
+    IBankMsg? Handle(BankConnection bc);
     // ToString in on object and does not need to be defined here
 }
 public interface IMsgWithDetails : IBankMsg
@@ -98,7 +98,7 @@ public class BankMsg<T> : IBankMsg where T: IBankMsg, new()
     }}
     public MsgType GetMsgType() => T.Type;
 
-    public virtual IBankMsg Handle(BankConnection bc)
+    public virtual IBankMsg? Handle(BankConnection bc)
             => throw new NotImplementedException($"Handling of message {T.Type} was not implemented");
 
     public static IBankMsg FromString(string str)
@@ -114,7 +114,7 @@ public class BankMsg<T> : IBankMsg where T: IBankMsg, new()
     {
         str = str.Trim();
         if (str.Length != 2)
-            throw new ArgumentException("Message type has incorrect length.");
+            throw new ArgumentException("Message has incorrect format.");
         var typeStr = String.Join("", str.Take(2)).ToUpper();
         if (typeStr != T.Type.ToString())
             throw new ArgumentException($"Cannot parse message as {T.Type}");
@@ -130,7 +130,7 @@ public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Conta
 
     public Contains() => InnerMsg = new U();
 
-    public override IBankMsg Handle(BankConnection bc)
+    public override IBankMsg? Handle(BankConnection bc)
     {
         if (InnerMsg is null)
             throw new NotImplementedException($"Handling of message {U.Type} was");
@@ -144,6 +144,10 @@ public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Conta
     }
 
     public override string? ToString() => InnerMsg.ToString();
+}
+public class BankResp<T>: BankMsg<T> where T: IBankMsg, new()
+{
+    public override IBankMsg? Handle(BankConnection bc) => null;
 }
 public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails  where T: IBankMsg, new()
 {
@@ -312,13 +316,18 @@ public sealed class BankCode : Contains<BankCode, BankMsg<BankCode>>
     {
         var resp = new BankCodeResp();
         resp.InnerMsg.Addr = NetworkListener.LocalAddr;
-        resp.InnerMsg.InnerMsg = new BankMsg<BankCodeResp>();
         return resp;
     }
 }
-public sealed class BankCodeResp : Contains<BankCodeResp, MsgWithIpAddr<BankMsg<BankCodeResp>>>
+public sealed class BankCodeResp : Contains<BankCodeResp, MsgWithIpAddr<BankResp<BankCodeResp>>>
 {
     new public static MsgType Type => MsgType.BC;
+    public override IBankMsg? Handle(BankConnection bc)
+    {
+        bc.BankIp = InnerMsg.Addr;
+        Logger.Debug($"Got bank code {bc.BankIp}");
+        return null;
+    }
 }
 public sealed class BankAmount : Contains<BankAmount, BankMsg<BankAmount>>
 {
@@ -327,11 +336,10 @@ public sealed class BankAmount : Contains<BankAmount, BankMsg<BankAmount>>
     {
         var resp = new BankAmountResp();
         resp.InnerMsg.Amount = BankStorage.Get().TotalBalance();
-        resp.InnerMsg.InnerMsg = new BankMsg<BankAmountResp>();
         return resp;
     }
 }
-public sealed class BankAmountResp : Contains<BankAmountResp, MsgWithAmount<BankMsg<BankAmountResp>>>
+public sealed class BankAmountResp : Contains<BankAmountResp, MsgWithAmount<BankResp<BankAmountResp>>>
 {
     new public static MsgType Type => MsgType.BA;
 }
@@ -342,11 +350,10 @@ public sealed class BankNumber : Contains<BankNumber, BankMsg<BankNumber>>
     {
         var resp = new BankNumberResp();
         resp.InnerMsg.Amount = BankStorage.Get().AccountCount();
-        resp.InnerMsg.InnerMsg = new BankMsg<BankNumberResp>();
         return resp;
     }
 }
-public sealed class BankNumberResp : Contains<BankNumberResp, MsgWithAmount<BankMsg<BankNumberResp>>>
+public sealed class BankNumberResp : Contains<BankNumberResp, MsgWithAmount<BankResp<BankNumberResp>>>
 {
     new public static MsgType Type => MsgType.BN;
 }
@@ -359,11 +366,10 @@ public sealed class AccountCreate : Contains<AccountCreate, BankMsg<AccountCreat
         var resp = new AccountCreateResp();
         resp.InnerMsg.Code = NetworkListener.LocalAddr.ToString();
         resp.InnerMsg.Account = BankStorage.Get().OpenAccount();
-        resp.InnerMsg.InnerMsg = new BankMsg<AccountCreateResp>();
         return resp;
     }
 }
-public sealed class AccountCreateResp : Contains<AccountCreateResp, MsgWithDetails<BankMsg<AccountCreateResp>>>
+public sealed class AccountCreateResp : Contains<AccountCreateResp, MsgWithDetails<BankResp<AccountCreateResp>>>
 {
     new public static MsgType Type => MsgType.AC;
 }
@@ -378,7 +384,7 @@ public sealed class AccountDeposit : Contains<AccountDeposit, MsgWithAmount<MsgW
         return resp;
     }
 }
-public sealed class AccountDepositResp : Contains<AccountDepositResp, BankMsg<AccountDepositResp>>
+public sealed class AccountDepositResp : Contains<AccountDepositResp, BankResp<AccountDepositResp>>
 {
     new public static MsgType Type => MsgType.AD;
 }
@@ -393,7 +399,7 @@ public sealed class AccountWithdraw : Contains<AccountWithdraw, MsgWithAmount<Ms
         return resp;
     }
 }
-public sealed class AccountWithdrawResp : Contains<AccountWithdrawResp, BankMsg<AccountWithdrawResp>>
+public sealed class AccountWithdrawResp : Contains<AccountWithdrawResp, BankResp<AccountWithdrawResp>>
 {
     new public static MsgType Type => MsgType.AW;
 }
@@ -405,11 +411,10 @@ public sealed class AccountBalance : Contains<AccountBalance, MsgWithDetails<Ban
         var storage = BankStorage.Get();
         var resp = new AccountBalanceResp();
         resp.InnerMsg.Amount = storage.Balance(InnerMsg.Account);
-        resp.InnerMsg.InnerMsg = new BankMsg<AccountBalanceResp>();
         return resp;
     }
 }
-public sealed class AccountBalanceResp : Contains<AccountBalanceResp, MsgWithAmount<BankMsg<AccountBalanceResp>>>
+public sealed class AccountBalanceResp : Contains<AccountBalanceResp, MsgWithAmount<BankResp<AccountBalanceResp>>>
 {
     new public static MsgType Type => MsgType.AB;
 }
@@ -424,7 +429,7 @@ public sealed class AccountRemove : Contains<AccountRemove, MsgWithDetails<BankM
         return resp;
     }
 }
-public sealed class AccountRemoveResp : Contains<AccountRemoveResp, BankMsg<AccountRemoveResp>>
+public sealed class AccountRemoveResp : Contains<AccountRemoveResp, BankResp<AccountRemoveResp>>
 {
     new public static MsgType Type => MsgType.AR;
 }
@@ -433,12 +438,12 @@ public sealed class RobberyPlan : Contains<RobberyPlan, MsgWithAmount<BankMsg<Ro
 {
     new public static MsgType Type => MsgType.RP;
 }
-public sealed class RobberyPlanResp : Contains<RobberyPlanResp, MsgWithString<BankMsg<RobberyPlanResp>>>
+public sealed class RobberyPlanResp : Contains<RobberyPlanResp, MsgWithString<BankResp<RobberyPlanResp>>>
 {
     new public static MsgType Type => MsgType.RP;
 }
 
-public sealed class ErrorResp : Contains<ErrorResp, MsgWithString<BankMsg<ErrorResp>>>
+public sealed class ErrorResp : Contains<ErrorResp, MsgWithString<BankResp<ErrorResp>>>
 {
     new public static MsgType Type => MsgType.ER;
     public override IBankMsg Handle(BankConnection bc)

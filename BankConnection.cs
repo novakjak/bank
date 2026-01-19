@@ -11,7 +11,7 @@ public class BankConnection
 {
     public static string Code { get; } = NetworkListener.GetLocalAddr().ToString();
 
-    public IPAddress? BankIp { get; private set; }
+    public IPAddress? BankIp { get; set; }
     public IPAddress RealIp { get; private set; }
     public int Port { get; private set; }
 
@@ -137,7 +137,8 @@ public class BankConnection
                 Logger.Info($"Received message from {BankIp ?? RealIp} - {msg}");
 
                 var resp = msg.Handle(this);
-                await SendMessage(resp);
+                if (resp is not null)
+                    await SendMessage(resp);
             }
             catch (Exception e)
             {
