@@ -44,7 +44,8 @@ public class BankConnection
     {
         _client = client;
         TimeoutMs = Config.Get().Timeout * 1000;
-        _tokenSource = tokenSource;
+        _tokenSource = CancellationTokenSource
+            .CreateLinkedTokenSource(tokenSource.Token);
         RealIp = _client.IPEndPoint.Address;
         Port = _client.IPEndPoint.Port;
     }
@@ -52,12 +53,14 @@ public class BankConnection
     {
         _client = new NetworkClient();
         TimeoutMs = Config.Get().Timeout * 1000;
-        _tokenSource = tokenSource;
+        _tokenSource = CancellationTokenSource
+            .CreateLinkedTokenSource(tokenSource.Token);
         RealIp = addr;
         Port = port;
     }
     public void Start()
     {
+        _tokenSource.TryReset();
         Started = true;
         _connectionTask ??= Task.Run(Run, _tokenSource.Token);
     }
@@ -167,6 +170,7 @@ public class BankConnection
     public void Stop()
     {
         Started = false;
+        _tokenSource.Cancel();
         _connectionTask = null;
         _writer?.Close();
         _client.Close();

@@ -67,11 +67,13 @@ public class ConnectionManager
 
     private void Start()
     {
+        _tokenSource.TryReset();
         _listener.Start();
     }
 
     private void Stop()
     {
+        _tokenSource.Cancel();
         _listener.Stop();
     }
 }
