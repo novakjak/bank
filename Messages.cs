@@ -68,8 +68,8 @@ public interface IBankMsg
     static abstract MsgType Type { get; }
     MsgType GetMsgType();
     static abstract IBankMsg FromString(string str);
+    string ToString();
     IBankMsg? Handle(BankConnection bc);
-    // ToString in on object and does not need to be defined here
 }
 public interface IMsgWithDetails : IBankMsg
 {
@@ -121,7 +121,7 @@ public class BankMsg<T> : IBankMsg where T: IBankMsg, new()
         str = String.Empty;
     }
 
-    public override string? ToString() => $"{T.Type.ToString()}";
+    public override string ToString() => $"{T.Type.ToString()}";
 }
 public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Contains<T, U>, new()
 {
@@ -143,7 +143,7 @@ public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Conta
         return t;
     }
 
-    public override string? ToString() => InnerMsg.ToString();
+    public override string ToString() => InnerMsg.ToString();
 }
 public class BankResp<T>: BankMsg<T> where T: IBankMsg, new()
 {
@@ -201,7 +201,7 @@ public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails
         return (number, addr);
     }
 
-    public override string? ToString() => $"{InnerMsg.ToString()} {Account}/{Code}";
+    public override string ToString() => $"{InnerMsg.ToString()} {Account}/{Code}";
 }
 public class MsgWithAmount<T> : Contains<MsgWithAmount<T>, T>, IMsgWithAmount  where T: IBankMsg, new()
 {
@@ -237,7 +237,7 @@ public class MsgWithAmount<T> : Contains<MsgWithAmount<T>, T>, IMsgWithAmount  w
         }
     }
 
-    public override string? ToString() => $"{InnerMsg.ToString()} {Amount}";
+    public override string ToString() => $"{InnerMsg.ToString()} {Amount}";
 }
 public class MsgWithString<T> : Contains<MsgWithString<T>, T>, IMsgWithString  where T: IBankMsg, new()
 {
@@ -266,7 +266,7 @@ public class MsgWithString<T> : Contains<MsgWithString<T>, T>, IMsgWithString  w
         return String.Join(" ", msgStr);
     }
 
-    public override string? ToString() => $"{InnerMsg.ToString()} {Str}";
+    public override string ToString() => $"{InnerMsg.ToString()} {Str}";
 }
 public class MsgWithIpAddr<T> : Contains<MsgWithIpAddr<T>, T>, IMsgWithIpAddr  where T: IBankMsg, new()
 {
@@ -306,7 +306,7 @@ public class MsgWithIpAddr<T> : Contains<MsgWithIpAddr<T>, T>, IMsgWithIpAddr  w
         return addr;
     }
 
-    public override string? ToString() => $"{InnerMsg.ToString()} {Addr.ToString()}";
+    public override string ToString() => $"{InnerMsg.ToString()} {Addr.ToString()}";
 }
 
 public sealed class BankCode : Contains<BankCode, BankMsg<BankCode>>
