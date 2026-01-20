@@ -5,18 +5,22 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-const int START_PORT = 65525;
-const int MAX_PORT = 65535;
 const string CONFIG_FILE = "settings.ini";
 
 var conf = ConfigParser.Parse<Config>(CONFIG_FILE);
 
-
 var tokenSource = new CancellationTokenSource();
 
-using var listener = conf.DefaultPort is not null
-    ? NetworkListener.Create((int)conf.DefaultPort)
-    : NetworkListener.CreateWithinRange(START_PORT, MAX_PORT);
+int min_port = BankConnection.MIN_PORT;
+int max_port = BankConnection.MAX_PORT;
+int? def_port = conf.DefaultPort;
+
+if (def_port < min_port || def_port > max_port)
+    Logger.Warn($"Warning: Using port ({def_port}) out of the standard range ({min_port} - {max_port}); service might be unreachable.");
+
+using var listener = def_port is not null
+    ? NetworkListener.Create((int)def_port)
+    : NetworkListener.CreateWithinRange(BankConnection.MIN_PORT, BankConnection.MAX_PORT);
 if (listener is null)
 {
     Logger.Error("No port available");

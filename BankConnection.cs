@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 
 public class BankConnection
 {
+    public const int MIN_PORT = 65525;
+    public const int MAX_PORT = 65535;
     public static string Code { get; } = NetworkListener.GetLocalAddr().ToString();
 
     public IPAddress? BankIp { get; set; }
