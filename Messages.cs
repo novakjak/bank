@@ -109,6 +109,14 @@ public class BankMsg<T> : IBankMsg where T: IBankMsg, new()
         return this;
     }
 
+    public bool TryProxy(IPAddress to, BankConnection bc)
+    {
+        if (to == NetworkListener.LocalAddr)
+            return false;
+        bc.RaiseProxyRequest(to, this);
+        return true;
+    }
+
     private static void ConsumeType(ref string str)
     {
         str = str.Trim();
@@ -369,6 +377,8 @@ public sealed class AccountDeposit : Contains<AccountDeposit, MsgWithAmount<MsgW
     new public static MsgType Type => MsgType.AD;
     public override IBankMsg? Handle(BankConnection bc)
     {
+        if (TryProxy(InnerMsg.InnerMsg.Code, bc))
+            return null;
         var storage = BankStorage.Get();
         storage.Deposit(InnerMsg.InnerMsg.Account, InnerMsg.Amount);
         var resp = new AccountDepositResp();
@@ -384,6 +394,8 @@ public sealed class AccountWithdraw : Contains<AccountWithdraw, MsgWithAmount<Ms
     new public static MsgType Type => MsgType.AW;
     public override IBankMsg? Handle(BankConnection bc)
     {
+        if (TryProxy(InnerMsg.InnerMsg.Code, bc))
+            return null;
         var storage = BankStorage.Get();
         storage.Withdraw(InnerMsg.InnerMsg.Account, InnerMsg.Amount);
         var resp = new AccountWithdrawResp();
@@ -399,6 +411,8 @@ public sealed class AccountBalance : Contains<AccountBalance, MsgWithDetails<Ban
     new public static MsgType Type => MsgType.AB;
     public override IBankMsg? Handle(BankConnection bc)
     {
+        if (TryProxy(InnerMsg.Code, bc))
+            return null;
         var storage = BankStorage.Get();
         var resp = new AccountBalanceResp();
         resp.InnerMsg.Amount = storage.Balance(InnerMsg.Account);
@@ -414,6 +428,8 @@ public sealed class AccountRemove : Contains<AccountRemove, MsgWithDetails<BankM
     new public static MsgType Type => MsgType.AR;
     public override IBankMsg? Handle(BankConnection bc)
     {
+        if (TryProxy(InnerMsg.Code, bc))
+            return null;
         var storage = BankStorage.Get();
         storage.Remove(InnerMsg.Account);
         var resp = new AccountRemoveResp();

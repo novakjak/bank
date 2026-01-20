@@ -13,6 +13,10 @@ public class BankConnection
     public const int MAX_PORT = 65535;
     public static string Code { get; } = NetworkListener.GetLocalAddr().ToString();
 
+    public event EventHandler<(IPAddress addr, int port, IBankMsg msg)>? ReceivedProxyResponse;
+    public event EventHandler<(IPAddress fromBank, IPAddress toBank, IBankMsg msg)>? ProxyRequest;
+    public event EventHandler? ConnectionTerminated;
+
     public IPAddress? BankIp { get; set; }
     public IPAddress RealIp { get; private set; }
     public int Port { get; private set; }
@@ -35,11 +39,14 @@ public class BankConnection
     }
 
     private INetworkClient _client;
+    private StreamReader? _reader;
     private StreamWriter? _writer;
     private BankStorage _bank = BankStorage.Get();
     private CancellationTokenSource _tokenSource;
     private Task? _connectionTask;
+    private SemaphoreSlim _respLock = new(1);
     private int[] _expectedResponses = new int[Enum.GetValues<MsgType>().Count()];
+    private List<(IPAddress addr, int port, MsgType type)> _expectedProxyResponses = new();
 
     
     public BankConnection(INetworkClient client, CancellationTokenSource tokenSource)
@@ -67,16 +74,27 @@ public class BankConnection
         _connectionTask ??= Task.Run(Run, _tokenSource.Token);
     }
 
-    public async Task Run()
+    public void Stop()
+    {
+        ConnectionTerminated?.Invoke(this, EventArgs.Empty);
+        Started = false;
+        _tokenSource.Cancel();
+        _connectionTask = null;
+        _writer?.Close();
+        _reader?.Close();
+        _client.Close();
+        Logger.Info($"Terminated connection with {BankIp ?? RealIp}");
+    }
+
+    private async Task Run()
     {
         if (!_client.Connected)
             await _client.ConnectAsync(RealIp, Port, _tokenSource.Token);
         Logger.Info($"Started communication with {BankIp ?? RealIp}");
-        using var stream = _client.GetStream();
-        using var reader = new StreamReader(stream);
+        var stream = _client.GetStream();
+        _reader = new StreamReader(stream);
         _writer = new StreamWriter(stream);
-        var bankCode = new BankCode();
-        await SendMessage(bankCode);
+        await SendMessage(new BankCode());
 
         while (Started)
         {
@@ -88,7 +106,7 @@ public class BankConnection
                 var timeout = CancellationTokenSource
                     .CreateLinkedTokenSource(_tokenSource.Token);
                 timeout.CancelAfter(TimeoutMs);
-                line = (await reader.ReadLineAsync(timeout.Token))!.Trim();
+                line = (await _reader!.ReadLineAsync(timeout.Token))!.Trim();
             }
             catch (OperationCanceledException)
             {
@@ -106,15 +124,23 @@ public class BankConnection
                 continue;
             for (int i = 0; i < _expectedResponses.Count(); i++)
             {
-                if (_expectedResponses[i] == 0 && i != (int)MsgType.ER)
+                var t = (MsgType)i;
+                if (_expectedResponses[i] == 0
+                    && _expectedProxyResponses.Count(r => r.type == t) == 0
+                    && i != (int)MsgType.ER)
+                {
                     continue;
+                }
                 try
                 {
-                    var t = (MsgType)i;
                     msg = t.RespFromString(line);
+                    if (await TryProxyResponseBack(t, msg))
+                        continue;
+                    await _respLock.WaitAsync();
                     _expectedResponses[i] -= 1;
+                    _respLock.Release();
                     wasResponse = true;
-                    Logger.Info($"Received response fom {BankIp ?? RealIp} - {msg}");
+                    Logger.Info($"Received response from {BankIp ?? RealIp} - {msg}");
                     break;
                 }
                 catch
@@ -143,11 +169,11 @@ public class BankConnection
 
                 var resp = msg.Handle(this);
                 if (resp is not null)
-                    await SendMessage(resp);
+                    await SendResponse(resp);
             }
             catch (Exception e)
             {
-                await SendMessage($"ER {e.Message}");
+                await SendResponse($"ER {e.Message}");
                 Logger.Error(e.Message);
                 continue;
             }
@@ -155,27 +181,76 @@ public class BankConnection
         Stop();
     }
 
-    public async Task SendMessage(IBankMsg msg)
+    public async Task<bool> TryProxyResponseBack(MsgType type, IBankMsg msg)
     {
-        _expectedResponses[(int)msg.GetMsgType()] += 1;
-        await SendMessage(msg.ToString()!);
+        // When receiving a response it's not possible to accurately
+        // judge whether the response was for a message sent by this
+        // node  or if it was proxied and if it should be sent back.
+        // Thus if a response to a proxied message is expected, it
+        // is sent back even though it might've been a response
+        // sent by to a message from this node. Errors are even worse.
+        // Since error messages are not labeled in any way, it's
+        // impossible to tell for which message the error is meant.
+        // Errors are sent to whoever is waiting on more responses.
+        var i = (int)type;
+
+        await _respLock.WaitAsync();
+        try
+        {
+            var expectedProxy = _expectedProxyResponses.Count();
+            var expectedProxyOfType = _expectedProxyResponses.Count(r => r.type == type);
+            var expected = _expectedResponses.Sum();
+            var msgDiff = expectedProxy - expected;
+            if (expectedProxyOfType > 0 || (type == MsgType.ER && msgDiff > 0))
+            {
+                var idx = _expectedProxyResponses.FindIndex(r => r.type == type);
+                var addr = _expectedProxyResponses[idx].addr;
+                var port = _expectedProxyResponses[idx].port;
+                _expectedProxyResponses.RemoveAt(idx);
+                ReceivedProxyResponse?.Invoke(this, (addr, port, msg));
+                Logger.Info($"Received response from {BankIp ?? RealIp} to proxied message from {addr} - {msg}");
+                return true;
+            }
+        }
+        finally
+        {
+            _respLock.Release();
+        }
+        return false;
     }
-    public async Task SendMessage(string msg)
+
+    public void RaiseProxyRequest(IPAddress to, IBankMsg msg)
+        => ProxyRequest?.Invoke(this, (NetworkListener.LocalAddr, to, msg));
+
+    public async Task Proxy(IPAddress fromAddr, IBankMsg msg)
     {
-        var task = _writer?.WriteLineAsync(msg.AsMemory(), _tokenSource.Token);
-        if (task is not null)
-            await task;
+        await _respLock.WaitAsync();
+        _expectedProxyResponses.Add((fromAddr, Port, msg.GetMsgType()));
+        _respLock.Release();
+        await SendMessage(msg.ToString());
+    }
+    public async Task ProxyResponse(IBankMsg resp)
+        => await SendResponse(resp.ToString());
+
+    private async Task SendMessage(IBankMsg msg)
+    {
+        await _respLock.WaitAsync();
+        _expectedResponses[(int)msg.GetMsgType()] += 1;
+        _respLock.Release();
+        await SendMessage(msg.ToString());
+    }
+    private async Task SendMessage(string msg)
+    {
+        await _writer!.WriteLineAsync(msg.AsMemory(), _tokenSource.Token);
         _writer?.Flush();
         Logger.Info($"Sent message to {BankIp ?? RealIp} - {msg}");
     }
-
-    public void Stop()
+    private async Task SendResponse(IBankMsg msg)
+        => await SendResponse(msg.ToString());
+    private async Task SendResponse(string resp)
     {
-        Started = false;
-        _tokenSource.Cancel();
-        _connectionTask = null;
-        _writer?.Close();
-        _client.Close();
-        Logger.Info($"Terminated connection with {BankIp ?? RealIp}");
+        await _writer!.WriteLineAsync(resp.AsMemory(), _tokenSource.Token);
+        _writer?.Flush();
+        Logger.Info($"Sent response to {BankIp ?? RealIp} - {resp}");
     }
 }
