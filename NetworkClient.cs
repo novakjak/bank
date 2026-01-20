@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 public interface INetworkClient : IDisposable
 {
     IPEndPoint IPEndPoint { get; }
+    IPEndPoint  RemoteEndPoint { get; }
     int SendTimeout { get; set; }
     int ReceiveTimeout { get; set; }
     bool Connected { get; }
@@ -25,6 +26,7 @@ public class NetworkClient : INetworkClient
     private TcpClient _client;
 
     public IPEndPoint IPEndPoint { get => (IPEndPoint)_client.Client.LocalEndPoint!; }
+    public IPEndPoint  RemoteEndPoint => (IPEndPoint)_client.Client.RemoteEndPoint!;
     public bool Connected { get => _client.Connected; }
     public NetworkClient() => _client = new TcpClient();
     public NetworkClient(TcpClient client) => _client = client;

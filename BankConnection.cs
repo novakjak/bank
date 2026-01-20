@@ -47,7 +47,7 @@ public class BankConnection
         _tokenSource = CancellationTokenSource
             .CreateLinkedTokenSource(tokenSource.Token);
         RealIp = _client.IPEndPoint.Address;
-        Port = _client.IPEndPoint.Port;
+        Port = _client.RemoteEndPoint.Port;
     }
     public BankConnection(IPAddress addr, int port, CancellationTokenSource tokenSource)
     {
