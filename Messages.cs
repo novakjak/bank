@@ -74,7 +74,7 @@ public interface IBankMsg
 public interface IMsgWithDetails : IBankMsg
 {
     public long Account { get; set; }
-    public string Code { get; set; }
+    public IPAddress Code { get; set; }
 }
 public interface IMsgWithAmount : IBankMsg
 {
@@ -122,6 +122,11 @@ public class BankMsg<T> : IBankMsg where T: IBankMsg, new()
 
     public override string ToString() => $"{T.Type.ToString()}";
 }
+public class BankResp<T>: BankMsg<T> where T: IBankMsg, new()
+{
+    new public static MsgType Type => T.Type;
+    public override IBankMsg? Handle(BankConnection bc) => null;
+}
 public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Contains<T, U>, new()
 {
     new public static MsgType Type => U.Type;
@@ -132,7 +137,7 @@ public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Conta
     public override IBankMsg? Handle(BankConnection bc)
     {
         if (InnerMsg is null)
-            throw new NotImplementedException($"Handling of message {U.Type} was");
+            throw new NotImplementedException($"Handling of message {U.Type} was not implemented");
         return InnerMsg.Handle(bc);
     }
     public override IBankMsg FromString(string str)
@@ -143,15 +148,11 @@ public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Conta
 
     public override string ToString() => InnerMsg.ToString();
 }
-public class BankResp<T>: BankMsg<T> where T: IBankMsg, new()
-{
-    public override IBankMsg? Handle(BankConnection bc) => null;
-}
 public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails  where T: IBankMsg, new()
 {
     new public static MsgType Type => T.Type;
     public long Account { get; set; }
-    public string Code { get; set; } = "";
+    public IPAddress Code { get; set; } = IPAddress.None;
 
     public override IBankMsg FromString(string str)
     {
@@ -354,7 +355,7 @@ public sealed class AccountCreate : Contains<AccountCreate, BankMsg<AccountCreat
     public override IBankMsg Handle(BankConnection bc)
     {
         var resp = new AccountCreateResp();
-        resp.InnerMsg.Code = NetworkListener.LocalAddr.ToString();
+        resp.InnerMsg.Code = NetworkListener.LocalAddr;
         resp.InnerMsg.Account = BankStorage.Get().OpenAccount();
         return resp;
     }
@@ -366,7 +367,7 @@ public sealed class AccountCreateResp : Contains<AccountCreateResp, MsgWithDetai
 public sealed class AccountDeposit : Contains<AccountDeposit, MsgWithAmount<MsgWithDetails<BankMsg<AccountDeposit>>>>
 {
     new public static MsgType Type => MsgType.AD;
-    public override IBankMsg Handle(BankConnection bc)
+    public override IBankMsg? Handle(BankConnection bc)
     {
         var storage = BankStorage.Get();
         storage.Deposit(InnerMsg.InnerMsg.Account, InnerMsg.Amount);
@@ -381,7 +382,7 @@ public sealed class AccountDepositResp : Contains<AccountDepositResp, BankResp<A
 public sealed class AccountWithdraw : Contains<AccountWithdraw, MsgWithAmount<MsgWithDetails<BankMsg<AccountWithdraw>>>>
 {
     new public static MsgType Type => MsgType.AW;
-    public override IBankMsg Handle(BankConnection bc)
+    public override IBankMsg? Handle(BankConnection bc)
     {
         var storage = BankStorage.Get();
         storage.Withdraw(InnerMsg.InnerMsg.Account, InnerMsg.Amount);
@@ -396,7 +397,7 @@ public sealed class AccountWithdrawResp : Contains<AccountWithdrawResp, BankResp
 public sealed class AccountBalance : Contains<AccountBalance, MsgWithDetails<BankMsg<AccountBalance>>>
 {
     new public static MsgType Type => MsgType.AB;
-    public override IBankMsg Handle(BankConnection bc)
+    public override IBankMsg? Handle(BankConnection bc)
     {
         var storage = BankStorage.Get();
         var resp = new AccountBalanceResp();
@@ -411,7 +412,7 @@ public sealed class AccountBalanceResp : Contains<AccountBalanceResp, MsgWithAmo
 public sealed class AccountRemove : Contains<AccountRemove, MsgWithDetails<BankMsg<AccountRemove>>>
 {
     new public static MsgType Type => MsgType.AR;
-    public override IBankMsg Handle(BankConnection bc)
+    public override IBankMsg? Handle(BankConnection bc)
     {
         var storage = BankStorage.Get();
         storage.Remove(InnerMsg.Account);
