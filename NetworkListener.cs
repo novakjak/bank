@@ -30,7 +30,7 @@ public class NetworkListener : INetworkListener, IDisposable
 
     public static INetworkListener Create(int port)
     {
-        var listener = new TcpListener(NetworkListener.LocalAddr, port);
+        var listener = new TcpListener(IPAddress.Any, port);
         return new NetworkListener(listener);
     }
 
