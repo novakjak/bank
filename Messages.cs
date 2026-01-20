@@ -20,15 +20,15 @@ public static class MsgTypeExtensions
 {
     public static IBankMsg MsgFromString(this MsgType type, string str) => type switch
     {
-        MsgType.BC => BankCode.FromString(str),
-        MsgType.BA => BankAmount.FromString(str),
-        MsgType.BN => BankNumber.FromString(str),
-        MsgType.AC => AccountCreate.FromString(str),
-        MsgType.AD => AccountDeposit.FromString(str),
-        MsgType.AW => AccountWithdraw.FromString(str),
-        MsgType.AB => AccountBalance.FromString(str),
-        MsgType.AR => AccountRemove.FromString(str),
-        MsgType.RP => RobberyPlan.FromString(str),
+        MsgType.BC => new BankCode().FromString(str),
+        MsgType.BA => new BankAmount().FromString(str),
+        MsgType.BN => new BankNumber().FromString(str),
+        MsgType.AC => new AccountCreate().FromString(str),
+        MsgType.AD => new AccountDeposit().FromString(str),
+        MsgType.AW => new AccountWithdraw().FromString(str),
+        MsgType.AB => new AccountBalance().FromString(str),
+        MsgType.AR => new AccountRemove().FromString(str),
+        MsgType.RP => new RobberyPlan().FromString(str),
         _ => throw new InvalidOperationException("Response type is invalid"),
     };
     public static IBankMsg MsgFromString(this string str)
@@ -49,25 +49,25 @@ public static class MsgTypeExtensions
     }
     public static IBankMsg RespFromString(this MsgType type, string str) => type switch
     {
-        MsgType.BC => BankCodeResp.FromString(str),
-        MsgType.BA => BankAmountResp.FromString(str),
-        MsgType.BN => BankNumberResp.FromString(str),
-        MsgType.AC => AccountCreateResp.FromString(str),
-        MsgType.AD => AccountDepositResp.FromString(str),
-        MsgType.AW => AccountWithdrawResp.FromString(str),
-        MsgType.AB => AccountBalanceResp.FromString(str),
-        MsgType.AR => AccountRemoveResp.FromString(str),
-        MsgType.RP => RobberyPlanResp.FromString(str),
-        MsgType.ER => ErrorResp.FromString(str),
+        MsgType.BC => new BankCodeResp().FromString(str),
+        MsgType.BA => new BankAmountResp().FromString(str),
+        MsgType.BN => new BankNumberResp().FromString(str),
+        MsgType.AC => new AccountCreateResp().FromString(str),
+        MsgType.AD => new AccountDepositResp().FromString(str),
+        MsgType.AW => new AccountWithdrawResp().FromString(str),
+        MsgType.AB => new AccountBalanceResp().FromString(str),
+        MsgType.AR => new AccountRemoveResp().FromString(str),
+        MsgType.RP => new RobberyPlanResp().FromString(str),
+        MsgType.ER => new ErrorResp().FromString(str),
         _ => throw new InvalidOperationException("Response type is invalid"),
     };
 }
 
 public interface IBankMsg
 {
-    static abstract MsgType Type { get; }
+    static virtual MsgType Type { get; }
     MsgType GetMsgType();
-    static abstract IBankMsg FromString(string str);
+    IBankMsg FromString(string str);
     string ToString();
     IBankMsg? Handle(BankConnection bc);
 }
@@ -101,13 +101,12 @@ public class BankMsg<T> : IBankMsg where T: IBankMsg, new()
     public virtual IBankMsg? Handle(BankConnection bc)
             => throw new NotImplementedException($"Handling of message {T.Type} was not implemented");
 
-    public static IBankMsg FromString(string str)
+    public virtual IBankMsg FromString(string str)
     {
         BankMsg<T>.ConsumeType(ref str);
         if (str.Length > 0)
             throw new ArgumentException("Too many arguments specified");
-        var t = new BankMsg<T>();
-        return t;
+        return this;
     }
 
     private static void ConsumeType(ref string str)
@@ -136,11 +135,10 @@ public class Contains<T, U> : BankMsg<U> where U: IBankMsg, new() where T: Conta
             throw new NotImplementedException($"Handling of message {U.Type} was");
         return InnerMsg.Handle(bc);
     }
-    new public static IBankMsg FromString(string str)
+    public override IBankMsg FromString(string str)
     {
-        var t = new T();
-        t.InnerMsg = (U)U.FromString(str);
-        return t;
+        InnerMsg.FromString(str);
+        return this;
     }
 
     public override string ToString() => InnerMsg.ToString();
@@ -155,19 +153,17 @@ public class MsgWithDetails<T> : Contains<MsgWithDetails<T>, T>, IMsgWithDetails
     public long Account { get; set; }
     public string Code { get; set; } = "";
 
-    new public static IBankMsg FromString(string str)
+    public override IBankMsg FromString(string str)
     {
         str = str.Trim();
         var (number, addr) = MsgWithDetails<T>.ConsumeAccountDetails(ref str);
-        var t = (T)T.FromString(str);
-        var msg = new MsgWithDetails<T>();
-        msg.Account = number;
-        msg.Code = addr.ToString();
-        msg.InnerMsg = t;
-        return msg;
+        Account = number;
+        Code = addr;
+        InnerMsg.FromString(str);
+        return this;
     }
 
-    public static (long, IPAddress) ConsumeAccountDetails(ref string str)
+    private static (long, IPAddress) ConsumeAccountDetails(ref string str)
     {
         char[] separators = {' ', '\t', '\v'};
         var parts = str.Split(separators, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -208,18 +204,16 @@ public class MsgWithAmount<T> : Contains<MsgWithAmount<T>, T>, IMsgWithAmount  w
     new public static MsgType Type => T.Type;
     public long Amount { get; set; }
 
-    new public static IBankMsg FromString(string str)
+    public override IBankMsg FromString(string str)
     {
         str = str.Trim();
         var amount = MsgWithAmount<T>.ConsumeAmount(ref str);
-        var t = (T)T.FromString(str);
-        var msg = new MsgWithAmount<T>();
-        msg.Amount = amount;
-        msg.InnerMsg = t;
-        return msg;
+        Amount = amount;
+        InnerMsg.FromString(str);
+        return this;
     }
 
-    public static long ConsumeAmount(ref string str)
+    private static long ConsumeAmount(ref string str)
     {
         char[] separators = {' ', '\t', '\v'};
         var parts = str.Split(separators, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -244,18 +238,16 @@ public class MsgWithString<T> : Contains<MsgWithString<T>, T>, IMsgWithString  w
     new public static MsgType Type => T.Type;
     public string Str { get; set; } = "";
 
-    new public static IBankMsg FromString(string str)
+    public override IBankMsg FromString(string str)
     {
         str = str.Trim();
         var strValue = MsgWithString<T>.ConsumeString(ref str);
-        var t = (T)T.FromString(str);
-        var msg = new MsgWithString<T>();
-        msg.Str = strValue;
-        msg.InnerMsg = t;
-        return msg;
+        Str = strValue;
+        InnerMsg.FromString(str);
+        return this;
     }
 
-    public static string ConsumeString(ref string str)
+    private static string ConsumeString(ref string str)
     {
         char[] separators = {' ', '\t', '\v'};
         var parts = str.Split(separators, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -273,18 +265,16 @@ public class MsgWithIpAddr<T> : Contains<MsgWithIpAddr<T>, T>, IMsgWithIpAddr  w
     new public static MsgType Type => T.Type;
     public IPAddress Addr { get; set; } = IPAddress.None;
 
-    new public static IBankMsg FromString(string str)
+    public override IBankMsg FromString(string str)
     {
         str = str.Trim();
         var addr = MsgWithIpAddr<T>.ConsumeIpAddr(ref str);
-        var t = (T)T.FromString(str);
-        var msg = new MsgWithIpAddr<T>();
-        msg.Addr = addr;
-        msg.InnerMsg = t;
-        return msg;
+        Addr = addr;
+        InnerMsg.FromString(str);
+        return this;
     }
 
-    public static IPAddress ConsumeIpAddr(ref string str)
+    private static IPAddress ConsumeIpAddr(ref string str)
     {
         char[] separators = {' ', '\t', '\v'};
         var parts = str.Split(separators, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
