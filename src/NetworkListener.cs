@@ -21,7 +21,27 @@ public interface INetworkListener : IDisposable
 
 public class NetworkListener : INetworkListener, IDisposable
 {
-    public static IPAddress LocalAddr { get; } = NetworkListener.GetLocalAddr();
+    private static IPAddress? _localAddr;
+    public static IPAddress LocalAddr
+    {
+        get
+        {
+            if (_localAddr != null)
+                return _localAddr;
+
+            try
+            {
+                _localAddr = GetLocalAddr();
+            }
+            catch
+            {
+                _localAddr = IPAddress.Loopback;
+            }
+
+            return _localAddr;
+        }
+    }
+
     private TcpListener _listener;
 
     public IPEndPoint LocalEndPoint { get => (_listener.LocalEndpoint as IPEndPoint)!; }

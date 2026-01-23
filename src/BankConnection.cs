@@ -227,17 +227,17 @@ public class BankConnection
         await _respLock.WaitAsync();
         _expectedProxyResponses.Add((fromAddr, Port, msg.GetMsgType()));
         _respLock.Release();
-        await SendMessage(msg.ToString());
+        await SendMessage(msg!.ToString());
     }
     public async Task ProxyResponse(IBankMsg resp)
-        => await SendResponse(resp.ToString());
+        => await SendResponse(resp!.ToString());
 
     private async Task SendMessage(IBankMsg msg)
     {
         await _respLock.WaitAsync();
         _expectedResponses[(int)msg.GetMsgType()] += 1;
         _respLock.Release();
-        await SendMessage(msg.ToString());
+        await SendMessage(msg!.ToString());
     }
     private async Task SendMessage(string msg)
     {
@@ -246,7 +246,7 @@ public class BankConnection
         Logger.Info($"Sent message to {BankIp ?? RealIp} - {msg}");
     }
     private async Task SendResponse(IBankMsg msg)
-        => await SendResponse(msg.ToString());
+        => await SendResponse(msg!.ToString());
     private async Task SendResponse(string resp)
     {
         await _writer!.WriteLineAsync(resp.AsMemory(), _tokenSource.Token);

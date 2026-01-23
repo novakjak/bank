@@ -3,7 +3,6 @@
 using System;
 using System.IO;
 using System.Reflection;
-
 using Microsoft.Extensions.Configuration;
 
 public interface IConfig<T>
@@ -24,6 +23,12 @@ public sealed class Config : IConfig<Config>
 
     [Section("networking")]
     public int? DefaultPort { get; set; } = null;
+	
+    [Section("persistence")]
+    public string CsvFile { get; set; } = "data/accounts.csv";
+
+    [Section("persistence")]
+    public string? MySql { get; set; } = null;
 
     private Config() {}
 
@@ -39,7 +44,7 @@ public sealed class ConfigParser
     public static T Parse<T>(string path) where T : IConfig<T>
     {
         var ini = new ConfigurationBuilder()
-            .AddIniFile(path, true)
+            .AddIniFile(path, optional: true)
             .Build();
 
         var type = typeof(T);
@@ -47,12 +52,14 @@ public sealed class ConfigParser
             throw new InvalidOperationException("Cannot parse a non config class");
 
         var conf = T.Get();
+
         foreach (var prop in type.GetProperties())
         {
             try
             {
                 var key = prop.Name;
                 var section = prop.GetCustomAttribute<SectionAttribute>();
+
                 if (section != null)
                     key = $"{section.Section}:{key}";
 
@@ -60,8 +67,12 @@ public sealed class ConfigParser
                 if (value != null)
                     prop.SetValue(conf, value);
             }
-            catch {}
+            catch
+            {
+                // intentionally ignored
+            }
         }
+
         return conf;
     }
 }

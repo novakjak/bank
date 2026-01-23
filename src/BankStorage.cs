@@ -1,120 +1,56 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
-
-// Singleton for storing information about bank accounts
-public class BankStorage
+public sealed class BankStorage
 {
-    private const long ACC_NUM_MIN = 10000;
-    private const long ACC_NUM_MAX = 99999;
-
-    public static BankStorage Storage { get => Get(); }
-    
     private static BankStorage? _instance;
-    private Dictionary<long, long> _accounts = new();
-    private long _nextAccNumber = ACC_NUM_MIN;
-    private ISet<long> _freeAccNumbers = new HashSet<long>();
-    private Lock _accountsLock = new();
+    private readonly IAccountStorage _storage;
+    private readonly string _bankCode;
 
-    private BankStorage()
+    private BankStorage(IAccountStorage storage)
     {
-        Load();
-        Logger.Debug("Initialized BankStorage singleton");
+        _storage = storage;
+        _bankCode = BankCodeUtil.Normalize(NetworkListener.LocalAddr);
+        _storage.Load();
+    }
+
+    public static void Init(IAccountStorage storage)
+    {
+        if (_instance != null)
+            throw new InvalidOperationException();
+        _instance = new BankStorage(storage);
     }
 
     public static BankStorage Get()
-    {
-        if (_instance is null)
-            _instance = new BankStorage();
-        return _instance;
-    }
-
-    public long TotalBalance() => _accounts.Values.Sum();
-    public long AccountCount() => _accounts.Count;
+        => _instance ?? throw new InvalidOperationException();
 
     public long OpenAccount()
-    {
-        lock (_accountsLock)
-        {
-            long accNum = -1;
-            if (_freeAccNumbers.Count > 0)
-            {
-                accNum = _freeAccNumbers.First();
-                _freeAccNumbers.Remove(accNum);
-            }
-            else if (_nextAccNumber <= ACC_NUM_MAX)
-            {
-                accNum = _nextAccNumber;
-                _nextAccNumber += 1;
-            }
-            else
-            {
-                throw new InvalidOperationException("No more accounts can be created");
-            }
+        => _storage.OpenAccount(_bankCode);
 
-            _accounts.Add(accNum, 0);
-            Logger.Info($"Opened account {accNum}");
-            return accNum;
-        }
-    }
-    public void Remove(long accNum)
+    public void Deposit(long acc, long amount)
     {
-        lock (_accountsLock)
-        {
-            ThrowOnNotExists(accNum);
-            if (_accounts[accNum] > 0)
-                throw new InvalidOperationException("Cannot delete account with funds in it");
-            Logger.Info($"Removed account {accNum}");
-            _accounts.Remove(accNum);
-        }
+        _storage.Deposit(acc, _bankCode, amount);
+        _storage.Save();
     }
 
-    public void Deposit(long accNum, long amount)
+    public void Withdraw(long acc, long amount)
     {
-        lock (_accountsLock)
-        {
-            ThrowOnNotExists(accNum);
-            _accounts[accNum] += amount;
-            Logger.Info($"Deposited {amount} to account {accNum}");
-        }
-    }
-    public void Withdraw(long accNum, long amount)
-    {
-        lock (_accountsLock)
-        {
-            ThrowOnNotExists(accNum);
-            if (_accounts[accNum] < amount)
-                throw new ArgumentException("Cannot withdraw more than is in account");
-            _accounts[accNum] -= amount;
-            Logger.Info($"Withdrawn {amount} from account {accNum}");
-        }
-    }
-    public long Balance(long accNum)
-    {
-        lock (_accountsLock)
-        {
-            ThrowOnNotExists(accNum);
-            return _accounts[accNum];
-        }
+        _storage.Withdraw(acc, _bankCode, amount);
+        _storage.Save();
     }
 
-    private void ThrowOnNotExists(long accNum)
+    public long Balance(long acc)
+        => _storage.Balance(acc, _bankCode);
+
+    public void Remove(long acc)
     {
-        if (!_accounts.ContainsKey(accNum))
-            throw new KeyNotFoundException($"Account {accNum} does not exist");
+        _storage.Remove(acc, _bankCode);
+        _storage.Save();
     }
 
-    private void Load()
-    {
-        // TODO: Load data from disk.
-    }
-    private void Save()
-    {
-        // TODO: Store data to disk.
-    }
+    public long TotalBalance()
+        => _storage.TotalBalance();
 
-    ~BankStorage()
-    {
-        Save();
-    }
+    public long AccountCount()
+        => _storage.AccountCount();
+
+    public void Save()
+        => _storage.Save();
 }

@@ -1,13 +1,14 @@
 ﻿using System;
-using System.Net;
-using System.Net.Sockets;
-using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 
 const string CONFIG_FILE = "settings.ini";
 
 var conf = ConfigParser.Parse<Config>(CONFIG_FILE);
+
+var csv = new CsvAccountStorage("data/accounts.csv");
+var db  = new MySqlAccountStorage(conf.MySql);
+var storage = new HybridAccountStorage(csv, db);
+BankStorage.Init(storage);
 
 var tokenSource = new CancellationTokenSource();
 

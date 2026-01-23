@@ -9,7 +9,10 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Počáteční projektová dokumentace (analýza a návrh)
 - Soubor CHANGELOG.md
+- Ukládání dat do db (mysql) nebo csv (fallback)
+- DB schéma
 
 ### Změněno
 
 - Reorganizace struktury projektu do složek
+- Logger zapisuje informace a chyby do různých souborů
