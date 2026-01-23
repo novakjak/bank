@@ -11,19 +11,28 @@ using System.Threading.Tasks;
 public sealed class Logger
 {
     const string TIME_FORMAT = "HH:mm:ss.ffff";
-    private readonly static string projectName = Assembly.GetCallingAssembly().GetName().Name!;
-    public readonly static string DefaultLogFile = $"{projectName}.log";
+    private readonly static string projectName =
+        Assembly.GetCallingAssembly().GetName().Name!;
 
-    
+    public readonly static string DefaultInfoLogFile = $"{projectName}-info.log";
+    public readonly static string DefaultErrorLogFile = $"{projectName}-error.log";
+
     private static Logger? _instance;
-    private FileStream _logFile;
-    private StreamWriter _writer;
+
+    private FileStream _infoLogFile;
+    private FileStream _errorLogFile;
+    private StreamWriter _infoWriter;
+    private StreamWriter _errorWriter;
 
     private Logger()
     {
-        _logFile = File.Open(Config.Get().LogFile, FileMode.Create);
-        _writer = new StreamWriter(_logFile);
-        _instance = this;
+        var config = Config.Get();
+
+        _infoLogFile = File.Open(config.InfoLogFile, FileMode.Append);
+        _errorLogFile = File.Open(config.ErrorLogFile, FileMode.Append);
+
+        _infoWriter = new StreamWriter(_infoLogFile);
+        _errorWriter = new StreamWriter(_errorLogFile);
     }
 
     private static Logger Get()
@@ -35,81 +44,85 @@ public sealed class Logger
     private static string BuildMessage(string message, string member, int lineNumber)
     {
         var frames = new StackTrace().GetFrames();
-        var frame = Array.Find(frames, fr => fr.GetMethod()?.DeclaringType != typeof(Logger))!;
+        var frame = Array.Find(frames,
+            fr => fr.GetMethod()?.DeclaringType != typeof(Logger))!;
         var method = frame.GetMethod()!;
-        // For some reason the extension attribute is not defined on the Handle methods in torrent task,
-        // so this does not work as it should. Mangled symbol names are still better than nothing so ¯\_(ツ)_/¯
+
         Type? classType = method.IsDefined(typeof(ExtensionAttribute))
             ? method.GetParameters()[0]?.ParameterType
             : method.DeclaringType;
+
         while (classType?.IsNested ?? false && classType?.DeclaringType is not null)
             classType = classType.DeclaringType;
 
-        string className = classType?.FullName ?? "<unknown>";
-
         var now = DateTime.Now.ToString(TIME_FORMAT);
-        var logMessage = $"[{now}] {className}.{member}:{lineNumber} - {message}";
-        return logMessage;
+        var className = classType?.FullName ?? "<unknown>";
+
+        return $"[{now}] {className}.{member}:{lineNumber} - {message}";
     }
 
-    public static void Log(LogLevel level, string message,
+    public static void Log(
+        LogLevel level,
+        string message,
         [CallerMemberName] string member = "",
         [CallerLineNumber] int lineNumber = 0)
     {
-        var logger = Logger.Get();
-        var logMessage = Logger.BuildMessage(message, member, lineNumber);
+        var logger = Get();
+        var logMessage = BuildMessage(message, member, lineNumber);
 
         Console.ForegroundColor = level.ToColor();
         Console.WriteLine(logMessage);
         Console.ResetColor();
-        logger._writer.WriteLine(logMessage);
-        logger._writer.Flush();
+
+        var writer = level == LogLevel.Error
+            ? logger._errorWriter
+            : logger._infoWriter;
+
+        writer.WriteLine(logMessage);
+        writer.Flush();
     }
 
-    public static async Task LogAsync(LogLevel level, string message,
+    public static async Task LogAsync(
+        LogLevel level,
+        string message,
         CancellationTokenSource? tokenSource = null,
         [CallerMemberName] string member = "",
         [CallerLineNumber] int lineNumber = 0)
     {
         tokenSource ??= new CancellationTokenSource();
-        var logger = Logger.Get();
-        var logMessage = Logger.BuildMessage(message, member, lineNumber);
+        var logger = Get();
+        var logMessage = BuildMessage(message, member, lineNumber);
 
         Console.ForegroundColor = level.ToColor();
         Console.Error.WriteLine(logMessage);
         Console.ResetColor();
 
-        await logger._writer.WriteLineAsync(logMessage.AsMemory(), tokenSource!.Token);
-        await logger._writer.FlushAsync(tokenSource!.Token);
-        
+        var writer = level == LogLevel.Error
+            ? logger._errorWriter
+            : logger._infoWriter;
+
+        await writer.WriteLineAsync(logMessage.AsMemory(), tokenSource.Token);
+        await writer.FlushAsync(tokenSource.Token);
     }
 
-    public static void Debug(string message, [CallerMemberName] string member = "", [CallerLineNumber] int ln = 0)
-        => Logger.Log(LogLevel.Info, message, member, ln);
-    public static void Info(string message, [CallerMemberName] string member = "", [CallerLineNumber] int ln = 0)
-        => Logger.Log(LogLevel.Info, message, member, ln);
-    public static void Warn(string message, [CallerMemberName] string member = "", [CallerLineNumber] int ln = 0)
-        => Logger.Log(LogLevel.Warning, message, member, ln);
-    public static void Error(string message, [CallerMemberName] string member = "", [CallerLineNumber] int ln = 0)
-        => Logger.Log(LogLevel.Error, message, member, ln);
+    public static void Debug(string message, [CallerMemberName] string m = "", [CallerLineNumber] int l = 0)
+        => Log(LogLevel.Info, message, m, l);
 
-    public static async Task DebugAsync(string message, CancellationTokenSource? tokenSource = null,
-        [CallerMemberName] string member = "", [CallerLineNumber] int ln = 0)
-        => await Logger.LogAsync(LogLevel.Info, message, tokenSource, member, ln);
-    public static async Task InfoAsync(string message, CancellationTokenSource? tokenSource = null,
-        [CallerMemberName] string member = "", [CallerLineNumber] int ln = 0)
-        => await Logger.LogAsync(LogLevel.Info, message, tokenSource, member, ln);
-    public static async Task WarnAsync(string message, CancellationTokenSource? tokenSource = null,
-        [CallerMemberName] string member = "", [CallerLineNumber] int ln = 0)
-        => await Logger.LogAsync(LogLevel.Warning, message, tokenSource, member, ln);
-    public static async Task ErrorAsync(string message, CancellationTokenSource? tokenSource = null,
-        [CallerMemberName] string member = "", [CallerLineNumber] int ln = 0)
-        => await Logger.LogAsync(LogLevel.Error, message, tokenSource, member, ln);
+    public static void Info(string message, [CallerMemberName] string m = "", [CallerLineNumber] int l = 0)
+        => Log(LogLevel.Info, message, m, l);
+
+    public static void Warn(string message, [CallerMemberName] string m = "", [CallerLineNumber] int l = 0)
+        => Log(LogLevel.Warning, message, m, l);
+
+    public static void Error(string message, [CallerMemberName] string m = "", [CallerLineNumber] int l = 0)
+        => Log(LogLevel.Error, message, m, l);
 
     ~Logger()
     {
-        _writer.Close();
-        _logFile.Close();
+        _infoWriter.Close();
+        _errorWriter.Close();
+        _infoLogFile.Close();
+        _errorLogFile.Close();
     }
 }
 
