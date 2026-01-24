@@ -10,6 +10,18 @@ var db  = new MySqlAccountStorage(conf.MySql);
 var storage = new HybridAccountStorage(csv, db);
 BankStorage.Init(storage);
 
+var metrics = ProgramMetrics.Instance;
+var monitoringDb = new MySqlMonitoringStorage(conf.MySql);
+
+var monitoring = new MonitoringService(
+    metrics,
+    monitoringDb,
+    () => ConnectionManager.Get().ActiveConnections,
+    () => storage.StrategyName == "MYSQL"
+        ? PersistenceStrategy.MYSQL
+        : PersistenceStrategy.CSV
+);
+
 var tokenSource = new CancellationTokenSource();
 
 int min_port = BankConnection.MIN_PORT;

@@ -32,11 +32,28 @@ public class ConnectionManager
             throw new InvalidOperationException("Connection manager has not yet been initialized");
         return _instance;
     }
+
     public static void Init(INetworkListener listener, CancellationTokenSource tokenSource)
     {
         if (_instance is not null)
             throw new InvalidOperationException("Connection manager has already been initialized");
         _instance = new ConnectionManager(listener, tokenSource);
+    }
+
+    public int ActiveConnections
+    {
+        get
+        {
+            _connectionLock.Wait();
+            try
+            {
+                return _connections.Count;
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
+        }
     }
 
     public async Task Run()
@@ -64,6 +81,7 @@ public class ConnectionManager
         _connections.Add(conn);
         _connectionLock.Release();
     }
+
     private async Task RemoveConnection(BankConnection conn)
     {
         await _connectionLock.WaitAsync();
@@ -88,13 +106,14 @@ public class ConnectionManager
         try
         {
             var conns = _connections.Where(c => c?.BankIp == addr);
-            if (conns.Count() > 0)
+            if (conns.Any())
                 return conns.ToList();
         }
         finally
         {
             _connectionLock.Release();
         }
+
         var foundConns = new List<BankConnection>();
         for (int port = BankConnection.MIN_PORT; port < BankConnection.MAX_PORT; port++)
         {
