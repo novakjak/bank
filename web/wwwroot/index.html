@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Bank Node Monitoring</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+<h1>Bank Node Monitoring</h1>
+
+<section>
+    <h2>Status</h2>
+    <div class="grid">
+        <div><b>Node:</b> <span id="status"></span></div>
+        <div><b>Health:</b> <span id="health"></span></div>
+        <div><b>Connections:</b> <span id="connections"></span></div>
+        <div><b>Total commands:</b> <span id="total"></span></div>
+        <div><b>Proxy commands:</b> <span id="proxy"></span></div>
+        <div><b>Errors:</b> <span id="errors"></span></div>
+        <div><b>Persistence:</b> <span id="persistence"></span></div>
+        <div><b>Updated:</b> <span id="updated"></span></div>
+    </div>
+</section>
+
+<section>
+    <h2>Commands</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Command</th>
+            <th>Count</th>
+            <th>Errors</th>
+            <th>Avg ms</th>
+        </tr>
+        </thead>
+        <tbody id="commands"></tbody>
+    </table>
+</section>
+
+
+<section>
+    <button id="reset">Reset metrics</button>
+    <button id="shutdown">Shutdown node</button>
+</section>
+
+<script src="/app.js"></script>
+
+</body>
+</html>

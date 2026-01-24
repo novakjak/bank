@@ -33,3 +33,12 @@ create table command_metrics (
     error_count bigint not null,
     avg_execution_ms double not null
 );
+
+create table node_control (
+    id int primary key check (id = 1),
+    shutdown_requested boolean not null default false
+);
+
+insert into node_control (id, shutdown_requested)
+values (1, false)
+on duplicate key update shutdown_requested = false;

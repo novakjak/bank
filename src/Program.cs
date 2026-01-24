@@ -19,7 +19,8 @@ var monitoring = new MonitoringService(
     () => ConnectionManager.Get().ActiveConnections,
     () => storage.StrategyName == "MYSQL"
         ? PersistenceStrategy.MYSQL
-        : PersistenceStrategy.CSV
+        : PersistenceStrategy.CSV,
+    conf.MySql
 );
 
 var tokenSource = new CancellationTokenSource();

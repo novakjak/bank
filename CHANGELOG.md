@@ -8,6 +8,8 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Přidáno
 
 - Monitoring statistik node (snapshoty + command metrics ukládané do MySQL)
+- Webové rozhraní, které zobrazuje statistiky
+- Možnost vypnout node přes web
 
 ---
 

@@ -73,5 +73,4 @@ public sealed class MetricsCollector
 
         _cmds.Clear();
     }
-
 }

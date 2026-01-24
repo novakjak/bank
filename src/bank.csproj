@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="settings.ini">
+    <Content Include="..\settings.ini">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
