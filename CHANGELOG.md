@@ -9,6 +9,12 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Unit a integrační testy
 - InMemoryAccountStorage pro testovací účely
+- README.md
+
+### Změněno
+
+- Diagramy
+- Design dokumentace
 
 ---
 
