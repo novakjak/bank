@@ -3,6 +3,15 @@
 Všechny významné změny tohoto projektu budou zaznamenány v tomto souboru.
 Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-01-25 - Martin Šilar
+
+### Přidáno
+
+- Unit a integrační testy
+- InMemoryAccountStorage pro testovací účely
+
+---
+
 ## 2026-01-24 - Martin Šilar
 
 ### Přidáno
