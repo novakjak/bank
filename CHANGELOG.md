@@ -41,3 +41,43 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Reorganizace struktury projektu do složek
 - Logger zapisuje informace a chyby do různých souborů
+
+## 2026-01-20 - Jakub Novák
+
+## Přidáno
+
+- Implementace proxyování zpráv a odpovědí
+
+## Změněno
+
+- Program povoluje připojení skrz loopback adrssu
+
+
+## 2026-01-19 - Jakub Novák
+
+## Změněno
+
+- Přidaná logika pro zpracování odpovědí
+- Opraveno přerušování tasků
+
+
+## 2026-01-18 - Jakub Novák
+
+## Přidáno
+
+- Logování
+- Konfigurace z konfiguračního souboru
+- Timeouty na připojení
+
+## Změněno
+
+- Oprava chyb v parsování zpráv
+
+
+## 2026-1-17 - Jakub Novák
+
+### Přidáno
+
+- Vytvořen projekt
+- Přidání funkcionality přijímání zpráv a zasílání odpovědí
+- Vytvořena logika pro parsování zpráv
